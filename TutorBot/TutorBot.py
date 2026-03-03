@@ -1,6 +1,6 @@
 import telebot
 import random
-TOKEN = '8483527762:AAGedDkn6IWjvV_K7jUAQXtNCYg3HiTBs8I'
+TOKEN = ''
 
 bot = telebot.TeleBot(TOKEN)
 
