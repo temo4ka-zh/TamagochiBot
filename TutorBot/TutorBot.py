@@ -1,18 +1,15 @@
-import telebot
-import random
 import os
-from keep_alive import keep_alive
+import random
+import telebot
 
-keep_alive()
-
-TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set.")
-
+TOKEN = ''
 bot = telebot.TeleBot(TOKEN)
 
 user_data = {}
 max_level = 10
+
+if not os.path.exists('images'):
+    os.makedirs('images')
 
 def init_user(user_id):
     if user_id not in user_data:
@@ -21,18 +18,9 @@ def init_user(user_id):
             'current_pet': None
         }
 
+# Основное меню
 main_kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-main_kb.row('Выбрать питомца', 'Создать питомца', 'Статус', 'Кормить', 'Играть', 'Разрядить обстановку')
-
-def create_pet_name_keyboard(user_id):
-    kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-    pets = list(user_data[user_id]['pets'].keys())
-    if pets:
-        for p in pets:
-            kb.row(p)
-    else:
-        kb.row('Нет питомцев')
-    return kb
+main_kb.row('Выбрать питомца', 'Создать питомца', 'Статус', 'Кормить', 'Играть', 'Разрядить обстановку', 'Загрузить аватар')
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
@@ -40,6 +28,7 @@ def handle_start(message):
     init_user(user_id)
     bot.send_message(user_id, "Привет! Это виртуальный питомец.\nВыберите 'Создать питомца' или 'Выбрать питомца'.", reply_markup=main_kb)
 
+# Создаем питомца
 @bot.message_handler(func=lambda m: m.text == 'Создать питомца')
 def handle_create_pet(message):
     user_id = message.chat.id
@@ -54,23 +43,11 @@ def process_pet_name(message):
         bot.send_message(user_id, "Питомец с таким именем уже есть. Введите другое имя:")
         bot.register_next_step_handler(message, process_pet_name)
         return
-    user_data[user_id]['pets'][pet_name] = {'name': pet_name, 'food': 50, 'mood': 50, 'level': 1}
+    user_data[user_id]['pets'][pet_name] = {'name': pet_name, 'food': 50, 'mood': 50, 'level':1}
     user_data[user_id]['current_pet'] = pet_name
     bot.send_message(user_id, f"Питомец '{pet_name}' создан и выбран.", reply_markup=main_kb)
 
-@bot.message_handler(func=lambda m: m.text == 'Разрядить обстановку')
-def little_joke(message):
-    user_id = message.chat.id
-    jokes = [
-        '— Я тут код написал…\n— Работает?\n— Да! Но только если не смотреть на него и ничего не трогать.',
-        '— Почему твой код такой длинный?\n-Это не код.\n— А что?\n— Документация к багу.',
-        '— Ты починил тот баг?\n— Да.\n— И что теперь?\n— Теперь их два.',
-        '— Как прошло ревью?\n— Отлично!\n— Тебя похвалили?\n— Нет, но я хотя бы понял, что жить можно и без самооценки.',
-        '— У тебя почему всё работает?\n— Потому что…\n— Потому что ты крутой?\n— Нет, потому что я боюсь трогать.'
-    ]
-    joke = random.choice(jokes)
-    bot.send_message(user_id, joke)
-
+# Выбираем питомца
 @bot.message_handler(func=lambda m: m.text == 'Выбрать питомца')
 def handle_select_pet(message):
     user_id = message.chat.id
@@ -84,19 +61,44 @@ def handle_select_pet(message):
         kb.row(p)
     bot.send_message(user_id, "Выберите питомца:", reply_markup=kb)
 
+# Обработка выбора питомца или команд
+@bot.message_handler(func=lambda m: m.text in user_data.get(m.chat.id, {}).get('pets', {}) or m.text in ['Статус', 'Кормить', 'Играть', 'Загрузить аватар'])
+def handle_pet_commands(message):
+    user_id = message.chat.id
+    init_user(user_id)
+    text = message.text
+    if text in user_data[user_id]['pets']:
+        user_data[user_id]['current_pet'] = text
+        bot.send_message(user_id, f"Вы выбрали питомца '{text}'. Что хотите сделать?", reply_markup=main_kb)
+        return
+    if text == 'Статус':
+        handle_status(message)
+    elif text == 'Кормить':
+        handle_feed(message)
+    elif text == 'Играть':
+        handle_play(message)
+    elif text == 'Загрузить аватар':
+        handle_upload_avatar(message)
+    else:
+        bot.send_message(user_id, "Неизвестная команда или выберите питомца.")
+
+# Получение текущего питомца
 def get_current_pet(user_id):
-    pet_name = user_data[user_id].get('current_pet')
+    pet_name = user_data[user_id]['current_pet']
     if pet_name and pet_name in user_data[user_id]['pets']:
         return user_data[user_id]['pets'][pet_name]
     return None
 
+# Проверка на смерть питомца
 def check_pet_dead(pet):
     return pet['food'] <= 0 or pet['mood'] <= 0
 
+# Воскрешение питомца
 def resurrect_pet(user_id, pet_name):
-    user_data[user_id]['pets'][pet_name] = {'name': pet_name, 'food': 50, 'mood': 50, 'level': 1}
+    user_data[user_id]['pets'][pet_name] = {'name': pet_name, 'food': 50, 'mood': 50, 'level':1}
     user_data[user_id]['current_pet'] = pet_name
 
+# Статус питомца (с аватаркой, если есть)
 def handle_status(message):
     user_id = message.chat.id
     pet = get_current_pet(user_id)
@@ -104,8 +106,16 @@ def handle_status(message):
         bot.send_message(user_id, "Нет выбранного питомца.")
         return
     status = f"Питомец: {pet['name']}\nЕда: {pet['food']}\nНастроение: {pet['mood']}\nУровень: {pet['level']}"
-    bot.send_message(user_id, status)
+    if 'avatar' in pet:
+        try:
+            with open(pet['avatar'], 'rb') as photo:
+                bot.send_photo(user_id, photo, caption=status)
+        except:
+            bot.send_message(user_id, status)
+    else:
+        bot.send_message(user_id, status)
 
+# Кормим питомца
 def handle_feed(message):
     user_id = message.chat.id
     pet = get_current_pet(user_id)
@@ -122,8 +132,9 @@ def handle_feed(message):
         pet['food'] = 100
     if pet['food'] >= 80:
         update_level(pet)
-    bot.send_message(message.chat.id, f"Еда: {pet['food']}. Настроение: {pet['mood']}. Уровень: {pet['level']}")
+    bot.send_message(user_id, f'Еда: {pet["food"]}. Настроение: {pet["mood"]}. Уровень: {pet["level"]}')
 
+# Играть с питомцем
 def handle_play(message):
     user_id = message.chat.id
     pet = get_current_pet(user_id)
@@ -138,35 +149,45 @@ def handle_play(message):
     pet['food'] -= 5
     if pet['mood'] > 100:
         pet['mood'] = 100
-    if pet['mood'] >= 80:
-        update_level(pet)
-    bot.send_message(message.chat.id, f"Еда: {pet['food']}. Настроение: {pet['mood']}. Уровень: {pet['level']}")
+    if pet['food'] < 0:
+        pet['food'] = 0
+    bot.send_message(user_id, f'Еда: {pet["food"]}. Настроение: {pet["mood"]}.')
 
+# Обновление уровня
 def update_level(pet):
-    if pet['level'] < max_level:
+    if 'level' in pet:
         pet['level'] += 1
+    else:
+        pet['level'] = 1
 
-@bot.message_handler(func=lambda m: True)
-def handle_all_messages(message):
+# Обработка фото для аватара
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
     user_id = message.chat.id
     init_user(user_id)
-    text = message.text
-    if text == 'Создать питомца':
-        handle_create_pet(message)
-    elif text == 'Выбрать питомца':
-        handle_select_pet(message)
-    elif text == 'Статус':
-        handle_status(message)
-    elif text == 'Кормить':
-        handle_feed(message)
-    elif text == 'Играть':
-        handle_play(message)
-    elif text == 'Разрядить обстановку':
-        little_joke(message)
-    elif text in user_data[user_id]['pets']:
-        user_data[user_id]['current_pet'] = text
-        bot.send_message(user_id, f"Вы выбрали питомца '{text}'. Что хотите сделать?", reply_markup=main_kb)
-    else:
-        bot.send_message(user_id, "Команда не распознана. Используйте меню.")
+    if not user_data[user_id]['current_pet']:
+        bot.send_message(user_id, "Сначала выберите питомца.")
+        return
+    pet_name = user_data[user_id]['current_pet']
+    pet = user_data[user_id]['pets'][pet_name]
+    try:
+        photo = message.photo[-1]
+        file_info = bot.get_file(photo.file_id)
+        file_path = file_info.file_path
+        file_content = bot.download_file(file_path)
+        filename = f'images/{user_id}_{pet_name}.jpg'
+        with open(filename, 'wb') as f:
+            f.write(file_content)
+        pet['avatar'] = filename
+        bot.send_message(user_id, f"Аватар питомца '{pet_name}' успешно установлен.")
+    except Exception as e:
+        bot.send_message(user_id, "Ошибка при сохранении аватара: " + str(e))
 
-bot.polling(non_stop=True)
+# Обработка команды для загрузки аватара (вызывается кнопкой)
+def handle_upload_avatar(message):
+    user_id = message.chat.id
+    init_user(user_id)
+    if not user_data[user_id]['current_pet']:
+        bot.send_message(user_id, "Сначала выберите питомца.")
+        return
+    bot.send_message(user_id, "Пожалуйста, отправьте фотографию питомца.")
