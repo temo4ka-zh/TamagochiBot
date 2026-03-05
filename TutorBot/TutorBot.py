@@ -20,7 +20,7 @@ def init_user(user_id):
 
 # Основное меню
 main_kb = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
-main_kb.row('Выбрать питомца', 'Создать питомца', 'Статус', 'Кормить', 'Играть', 'Разрядить обстановку', 'Загрузить аватар')
+main_kb.row('Выбрать питомца', 'Создать питомца', 'Статус', 'Кормить', 'Играть', 'Разрядить обстановку', 'Загрузить аватар', 'Удалить аватар')
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
@@ -183,6 +183,24 @@ def handle_photo(message):
     except Exception as e:
         bot.send_message(user_id, "Ошибка при сохранении аватара: " + str(e))
 
+@bot.message_handler(func=lambda m: m.text == 'Удалить аватар')
+def handle_delete_avatar(message):
+    user_id = message.chat.id
+    init_user(user_id)
+    pet_name = user_data[user_id]['current_pet']
+    if not pet_name:
+        bot.send_message(user_id, "Сначала выберите питомца.")
+        return
+    pet = user_data[user_id]['pets'][pet_name]
+    if 'avatar' in pet:
+        try:
+            os.remove(pet['avatar'])
+        except:
+            pass  # возможно, файл уже удален или его нет
+        del pet['avatar']
+        bot.send_message(user_id, "Аватар питомца удален.")
+    else:
+        bot.send_message(user_id, "У этого питомца нет аватара.")
 # Обработка команды для загрузки аватара (вызывается кнопкой)
 def handle_upload_avatar(message):
     user_id = message.chat.id
