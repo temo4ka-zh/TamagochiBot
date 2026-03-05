@@ -2,7 +2,7 @@ import os
 import random
 import telebot
 
-TOKEN = ''
+TOKEN = '8533332080:AAE7qeUDO0X3aD6RdYZC31-HVRvn84hPWCE'
 bot = telebot.TeleBot(TOKEN)
 
 user_data = {}
@@ -191,3 +191,4 @@ def handle_upload_avatar(message):
         bot.send_message(user_id, "Сначала выберите питомца.")
         return
     bot.send_message(user_id, "Пожалуйста, отправьте фотографию питомца.")
+bot.polling(non_stop=True)
