@@ -62,7 +62,7 @@ def handle_select_pet(message):
     bot.send_message(user_id, "Выберите питомца:", reply_markup=kb)
 
 # Обработка выбора питомца или команд
-@bot.message_handler(func=lambda m: m.text in user_data.get(m.chat.id, {}).get('pets', {}) or m.text in ['Статус', 'Кормить', 'Играть', 'Загрузить аватар'])
+@bot.message_handler(func=lambda m: m.text in user_data.get(m.chat.id, {}).get('pets', {}) or m.text in ['Статус', 'Кормить', 'Играть', 'Загрузить аватар', 'Удалить аватар'])
 def handle_pet_commands(message):
     user_id = message.chat.id
     init_user(user_id)
@@ -79,6 +79,8 @@ def handle_pet_commands(message):
         handle_play(message)
     elif text == 'Загрузить аватар':
         handle_upload_avatar(message)
+    elif text == 'Удалить аватар':
+        handle_delete_avatar(message)
     else:
         bot.send_message(user_id, "Неизвестная команда или выберите питомца.")
 
